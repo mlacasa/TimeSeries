@@ -1,0 +1,360 @@
+---
+title: "Series Temporales (I)"
+author: "Marcos Lacasa"
+date: "2023-12-01"
+output: 
+  html_document:          # la salida predefinida es html 
+# ver/ocultar los trozos de código  
+    #code_download: true  # si incluimos un botón para bajar el código o no
+    #code_folding: hide   # para mostrar o esconder los chunk de codigo 
+# tabla de contenido
+    #number_sections: yes   # numera los titulos
+    toc: TRUE               # incluye o no el indice
+    toc_float: TRUE         # incluye o no indice flotante
+      #collapsed: false      # que se escondan los tit
+      #smooth_scroll: false  # scroll en TOC
+# formato  estilo    
+    theme: "spacelab"    # especifica el tema Bootstrap
+    highlight: kate      # resaltado de sintaxis
+    #self_contained: false    # salida fichero autocontenido
+# formato de figuras
+    fig_width: 7         # ancho de las figuras por defecto
+    fig_height: 6        # alto de las figuras
+    fig_caption: true    # titulo de figura
+---
+
+
+# EJEMPLO SOBRE ANÁLISIS DE SERIES TEMPORALES
+
+El número de reservas de pasajeros internacionales (en miles) por mes. en una aerolínea (Pan Am) en los Estados Unidos se obtuvieron del Servicio Federal Administración de Aviación para el período 1949-1960 (Brown, 1963). La empresa utilizó los datos para predecir la demanda futura antes de ordenar nuevos aviones y tripulación aérea de entrenamiento. Los datos están disponibles como una serie de tiempo en R e ilustran varios conceptos importantes que surgen en un análisis exploratorio de series de tiempo.
+
+```{r warning=FALSE}
+data("AirPassengers")
+data = AirPassengers
+data
+```
+
+Se trata de una tabla que consta de columnas (meses) y filas (años) de una única variable.
+```{r}
+class(data)
+```
+"ts" significa "Time Series", realizamos un sencillo dibuno de la serie
+
+```{r}
+plot(data, ylab="Número de pasajeros", xlab="Años analizados")
+```
+
+Aparentemente el número de pasajeros se incrementa año tras año.Un patrón que se repite dentro de cada año se conoce como **variación estacional**, aunque el término se aplica de manera más general a patrones repetidos dentro de cualquier período fijo, como reservas en restaurantes en diferentes días de la semana. Allá Existe una clara variación estacional en la serie temporal de pasajeros aéreos. En ese momento, las reservas fueron más altos durante los meses de **verano** (junio, julio y agosto) y más bajo durante el resto del año. A veces podemos afirmar que hay ciclos en una serie de tiempo que no se corresponden a algún período natural fijo; Los ejemplos pueden incluir ciclos económicos o oscilaciones climáticas como El Niño. Ninguno de estos es evidente en la aerolínea.
+
+Para obtener una visión más clara de la tendencia, el efecto estacional se puede eliminar agregando los datos al nivel anual, lo que se puede lograr en R usando el función agregada (aggregate). Se puede consultar un resumen de los valores de cada temporada usando un diagrama de caja, con la función de ciclo utilizada para extraer las estaciones para cada elemento de datos.
+
+```{r}
+plot(aggregate(data)) # Suma de los pasajeros por año
+```
+
+El comando cycle determina la unidad de tiempo a la que pertenece cada observación de la serie:
+```{r}
+boxplot(data ~ cycle(data)) # Box plot de cada mes
+```
+```{r}
+cycle(data) #Vemos como trabaja cycle y asigna un número de mes a cada año.
+```
+## Múltiples series temporales: datos sobre electricidad, cerveza y chocolate.
+
+Aquí ilustramos algunas ideas y conceptos importantes relacionados con el tiempo y más de una variable. Los datos de la serie: el suministro mensual de electricidad (millones de kWh), cerveza (Ml), y producción de chocolate (toneladas) en Australia durante el período enero
+1958 a diciembre de 1990 están disponibles en la Oficina de Estadísticas de Australia.
+
+Para la dataset acb: https://github.com/dallascard/Introductory_Time_Series_with_R_datasets/tree/master
+
+```{r}
+cbe = read.table("E:/OneDrive/UNIR/2023/Clases/cbe.dat", header=TRUE)
+#cbe
+```
+```{r}
+# Convertimos la tabla en una serie temporal para cada una de las 3 variables
+Elec.ts <- ts(cbe[, 3], start = 1958, freq = 12)
+Beer.ts <- ts(cbe[, 2], start = 1958, freq = 12)
+Choc.ts <- ts(cbe[, 1], start = 1958, freq = 12)
+```
+```{r}
+#las dibujamos
+plot(cbind(Elec.ts, Beer.ts, Choc.ts))
+```
+Las tres series constituyen una serie temporal múltiple. Hay muchas funciones en R para manejar más de una serie, incluido ts.intersect para obtener la intersección de dos series que se superponen en el tiempo. Ahora ilustraremos el uso de la función *intersect* y señalan algunos obstáculos potenciales al analizar múltiples series de tiempo. La relación entre los datos de los pasajeros aéreos y la electricidad.
+Los datos se obtienen de la siguiente manera:
+
+```{r}
+AP.elec <- ts.intersect(data, Elec.ts) # Cargamos las datasets
+start(AP.elec) # comprobamos el inicio y mes
+```
+```{r}
+end(AP.elec) # final del mes y año
+```
+```{r}
+AP <- AP.elec[,1]; Elec <- AP.elec[,2]
+plot(AP, main = "", ylab = "Pasajeros")
+```
+```{r}
+plot(Elec, main = "", ylab = "Producción eléctrica / MkWh")
+```
+```{r}
+plot(as.vector(AP), as.vector(Elec),
+xlab = "nº pasajeros",
+ylab = "electricidad producida / MWh")
+abline(reg = lm(Elec ~ AP))
+```
+Existe una gran correlación, aunque debe evaluarse com *casual* y no *causal*.
+
+## Descomposición de una serie
+
+Es frecuente analizar las series temporales desde el punto de vista de sus componentes estructurales:
+
+Serie observada = Tendencia + Efecto estacional + Residuos.
+
+En este modelo, la serie observada es el resultado de sumar una tendencia que representa el comportamiento a largo plazo de la serie, un efecto estacional que describe sus fluctuaciones periódicas y un componente residual que describe las variaciones a corto plazo, normalmente impredecibles.
+
+Con R es muy sencillo obtener una descomposición estructural de este tipo. Se usa el comando decompose:
+```{r}
+data.desc = decompose(data)
+plot(data.desc, xlab='Año')
+```
+Significado:
+- Trend: La tendencia = media móvil.
+- Seasonal: Se calcula mediante las medias de las unidades de cada período, en este caso, meses.
+- Random: los residuos se obtienen restando a la serie observada las dos componentes anteriores.
+
+Ejemplo en la producción eléctrica
+
+```{r}
+plot(decompose(Elec.ts))
+```
+
+## Transformaciones de una serie
+
+Tomamos como ejemplo los datos mensuales del consumo de gasolina en España entre enero de 1966 y agosto de 1977.
+
+```{r}
+gas = scan('http://verso.mat.uam.es/~joser.berrendero/datos/gas6677.dat')
+plot(gas)
+```
+```{r}
+gas.ts = ts(gas, start = c(1966,1), frequency = 12) # Convertimos la dataset en una Timer Series
+plot(gas.ts)
+```
+```{r}
+boxplot(gas.ts ~ cycle(gas.ts))
+```
+```{r}
+plot(decompose(gas.ts), xlab='Año')
+```
+
+**Estabilización de la varianza**: Para estabilizar la variabilidad se suelen tomar logaritmos. Esta transformación funcionará bien cuando la variabilidad sea aproximadamente proporcional al nivel de la serie.
+
+```{r}
+plot(log(gas.ts))
+```
+
+**Eliminación de tendencia**: Considerar la serie de diferencias entre una observación y la anterior en lugar de la original. $\nabla x_t = x_t -x_{t-1}$ y hacemos sabiendo que La función diff() en R se utiliza para obtener la diferencia entre cada elemento de un vector de forma consecutiva.
+
+```{r}
+x = log(gas.ts)
+dif1.x = diff(x)
+plot(dif1.x)
+```
+**Eliminación de estacionalidad**: Para eliminar la estacionalidad de una serie mensual se pueden tomar diferencias estacionales de orden 12.Se trata de calcular $\nabla_{12} x_t = x_t - x_{t-12}$:
+```{r}
+dif12.dif1.x = diff(dif1.x, lag=12) # OJo, se trata de sumar sólo los valores entre un período de 12 (lag=12)
+plot(dif12.dif1.x)
+```
+Y esta ilustración se parece mucho a la parte "random" del modelo inicial.
+
+
+# Modelos pronósticos ARMA
+
+https://rstudio-pubs-static.s3.amazonaws.com/940087_a2c836710fdc42bab6d03131fc5b0e94.html
+
+```{r warning=FALSE}
+# Paquetes necesarios
+library(magrittr)
+library(tseries)
+library(tidyverse)
+library(readr)
+library(janitor)
+library(lubridate)
+```
+
+Se trata de predecir los datos de una serie temporal. Se cargan los datos del rendimiento de la reserva feredarl USA de sus bonos.
+
+```{r}
+data(tcm)
+
+# Gráfico
+plot(tcm10y,
+     main = 'Rendimiento mensual de los bonos del Tesoro de EE.UU.',
+     xlab = 'Año',
+     ylab = 'Rendimiento [%]',
+     lwd = 2)
+grid()
+```
+Está claro que no se trata de una serie estacionaria. 
+
+### La autocorrelación
+
+¿Existe alguna correlación entre el tiempo y la variable a estudiar? Con la función ACF podremos calcular tanto la función de autocovarianza como la función de autocorrelación.
+
+Los modelos ARIMA son acrónimo de su definición en inglés autoregressive (AR) integrated (I) moving average (MA) o se podría traducir como modelo autorregresivo integrado de media móvil.
+
+El modelo ARIMA genera una serie temporal a partir de 3 parámetros (p,d,q) llamados órdenes del modelo ARIMA(p,d,q). Como indica el acrónimo se trata de 3 modelos distintos unidos: AR + I + MA. Básicamente ARIMA son la forma generalizada de los modelos ARMA(p,q) que sirven para descomponer, analizar o pronosticar series temporales estacionarias.
+
+Para saber cómo aplicar los modelos ARIMA tendremos que aprender a interpretar las gráficas de autocorrelación ACF y autocorrelación parcial PACF de una serie temporal. Estas gráficas nos ayundan a estimar los órdenes (p,d,q) del modelo ARIMA.
+
+En cualquiera de estas representaciones, la banda entre las líneas azules intermitentes indican la zona de valores NO SIGNIFICATIVOS de correlación, que a efectos prácticos equivale a cero o NO correlación.
+
+```{r}
+# Analizamos el "random" para ver si existe una autocorrelación en el tiempo.
+acf(tcm10y,
+    main = 'Función de autocorrelación muestral',
+    xlab = 'Rezago',
+    ylab = 'ACF',
+    lwd = 3)
+grid()
+```
+
+Como se puede ver, la realización observada de este proceso estacionario no es ergódica, ya que la función de autocorrelación muestral no tiende a cero rápidamente, sino que aún para rezagos grandes, la ACF muestral es significativa estadísticamente. Además, este decrecimiento refleja precisamente la existencia de tendencia en esta serie de tiempo. De igual forma, apelando a la función de autocorrelación parcial (PACF) muestral, el retardo k, es la autocorrelación entre los valores de las series que se encuentran a k intervalos de distancia, no considerando la dependencia creada por los retardos intermedios existentes entre ambas:
+
+```{r}
+pacf(tcm10y,
+     main = 'Función de autocorrelación parcial muestral',
+     xlab = 'Rezago',
+     ylab = 'PACF',
+     lwd = 3)
+grid()
+```
+
+Para este gráfico se evidencia que las series rezagadas uno, dos y tres periodos en el tiempo, ignorando los rezagos internos, son significativas, corroborando que la serie en cuestión no es estacionaria.
+Buscamos pues un modelo autoregresivo del tipo 
+$$X_t = \phi_0 + \phi_1 X_{t-1} + \phi_2 X_{t-2} + \phi_3 X_{t-3} + w_t, w_t \sim R.B.$$
+Que retorna un valor que depende de los valores anteriores en función de unos coeficientes. En este modelo se acuerda que el corte significativo es 3, entonces evaluamos el modelo en R
+
+```{r}
+modelo1 <- arima(tcm10y, order = c(3, 0, 0))
+modelo1
+```
+El modelo que nos retorna es:
+$$\hat{X}_t = 5.9815 + 1.4033 X_{t-1} - 0.6438 X_{t-2} + 0.2351 X_{t-3}$$
+
+Si dibujamos el gráfico de los datos reales, y del modelo en función del período, tenemos:
+
+```{r}
+# Serie estimada
+modelo1_ajuste <- tcm10y - modelo1$residuals
+
+# Gráfico de la serie original
+plot(tcm10y,
+     main = 'Rendimiento mensual de los bonos del Tesoro de EE.UU.',
+     xlab = 'Año',
+     ylab = 'Rendimiento [%]',
+     lwd = 3,
+     col = 'gray')
+grid()
+
+# Gráfico de la serie estimada -- AR(3)
+
+lines(modelo1_ajuste,
+      col = 'red',
+      lty = 2)
+
+# Leyenda
+legend('topleft',
+       legend = c('Serie observada',
+                  'Serie estimada -- AR(3)'),
+       lwd = c(3, 0),
+       lty = c(1, 2),
+       col = c('gray', 'red'))
+```
+
+Parece que todo va bien, pero se puede producir "overfitting" y hay que descartarlo.
+
+Trabajamos con las diferencias inter-mensuales (o inter-data), $Y_t = X_{t} -X_{t-1}$
+
+```{r}
+# Serie con primera diferencia regular
+y <- diff(tcm10y)
+
+# Gráfico
+plot(y,
+     main = 'Diferencia inter-mensual consecutivo',
+     xlab = 'Año',
+     ylab = 'Rendimiento [%]',
+     lwd = 1) # grosor de las líneas
+grid()
+```
+
+Evaluamos de esta serie, el factor de autocorrelación.
+
+La gráfica ACF pinta en cada rezago o lag, el valor de autocorrelación. Esto se hace calculando el coeficiente de correlación de dos vectores o columnas. En la columna 1 ponemos la serie $X_t$  y en la dos la serie rezagada un intervalo $X_{t-1}$.  Los valores de ACF van de -1 a 1, Un valor próximo a 1 indica una gran correlación entre intervalos, si es próximo a -1 la correlación es inversa (los valores de hoy tienden a subir cuando los de ayer bajan), y uno próximo a 0 significa que las columnas comparadas son independientes = no podemos predecirlos (nada nos dice el valor de ayer respecto al que tenemos hoy). La gráfica PACF es la derivada o pendiente de la ACF y nos indica la correlación parcial entre los intervalos, descontando el efecto del resto. Como regla, la PACF define el orden de AR(p) y la ACF el orden de MA(q)
+
+```{r}
+acf(y,
+    main = 'Función de autocorrelación muestral',
+    xlab = 'Rezago',
+    ylab = 'ACF',
+    lwd = 3)# grosor de las líneas
+grid()
+```
+El lag, el último valor que supera la línea azul (signficativo) es 3. Por lo tanto p=3
+```{r}
+pacf(y,
+     main = 'Función de autocorrelación parcial muestral',
+     xlab = 'Rezago',
+     ylab = 'PACF',
+     lwd = 3)
+grid()
+```
+```{r}
+modelo2 <- arima(y, order = c(0, 0, 3))
+modelo2
+```
+Que nos ofrece: $\hat{X}_t = 0.0055 + 0.4494 w_{t-1} - 0.1219 w_{t-2} - 0.0077 w_{t-3}$
+
+y graficamos
+
+```{r}
+# Serie estimada
+modelo2_ajuste <- y - modelo2$residuals
+
+# Gráfico de la serie original
+plot(y,
+     main = 'Primera diferencia regular del rendimiento
+     mensual de los bonos del Tesoro de EE.UU.',
+     xlab = 'Año',
+     ylab = 'Rendimiento [%]',
+     lwd = 3,
+     col = 'gray')
+grid()
+
+# Gráfico de la serie estimada -- AR(3)
+
+lines(modelo2_ajuste,
+      col = 'red',
+      lty = 2)
+
+# Leyenda
+legend('topleft',
+       legend = c('Serie observada',
+                  'Serie estimada -- AR(3)'),
+       lwd = c(3, 0),
+       lty = c(1, 2),
+       col = c('gray', 'red'))
+```
+
+Un buen tuto para aprender más
+http://enrdados.net/post/series-temporales-con-arima-i/
+
+![](https://enrdados.netlify.app/post/2020-10-20-series-temporales-con-arima-i.es_files/arima002.png){width='100px'}
+
+
+
+
+
+
